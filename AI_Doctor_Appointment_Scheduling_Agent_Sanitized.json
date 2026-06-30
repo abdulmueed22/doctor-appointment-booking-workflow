@@ -1,5 +1,5 @@
 {
-  "name": "AI Doctor Appointment Scheduling Agent",
+  "name": "Sheduling Agent",
   "nodes": [
     {
       "parameters": {
@@ -11,10 +11,10 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        16,
-        -112
+        2272,
+        1952
       ],
-      "id": "ffe25ff0-c9d6-454a-9bcd-82998761bdf9",
+      "id": "9060ef7b-2b03-4f02-b94e-3e50d866d8d8",
       "name": "book appointment",
       "webhookId": "GENERATED_ON_IMPORT"
     },
@@ -28,10 +28,10 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        32,
-        -608
+        2288,
+        1456
       ],
-      "id": "2b57ddd3-e815-4a8b-b205-b276b6d5da14",
+      "id": "fafb6484-9f0d-49aa-9ac3-b3f8e9719776",
       "name": "check",
       "webhookId": "GENERATED_ON_IMPORT"
     },
@@ -46,10 +46,10 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
       "position": [
-        480,
-        -608
+        2736,
+        1456
       ],
-      "id": "9875af4b-bf00-421c-bddd-a90b4832c9fb",
+      "id": "a85d17f7-b9cd-4c2f-b315-549ec8a3328d",
       "name": "AI Agent"
     },
     {
@@ -66,24 +66,24 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
       "position": [
-        480,
-        -384
+        2736,
+        1680
       ],
-      "id": "e980ca41-9da7-4c1a-bd64-ee79f892f1ef",
+      "id": "fdeac5fd-463c-4afc-af1d-5bfb75939b7c",
       "name": "OpenAI Chat Model",
       "credentials": {}
     },
     {
       "parameters": {
-        "jsCode": "const toolCall = $json.body?.message?.toolCallList?.[0];\n\nreturn [\n  {\n    json: {\n      preferred_date: toolCall?.function?.arguments?.preferred_date || null,\n      preferred_time: toolCall?.function?.arguments?.preferred_time || null,\n      tool_name: toolCall?.function?.name || null,\n      tool_call_id: toolCall?.id || null,\n    }\n  }\n];"
+        "jsCode": "const toolCall = $json.body?.message?.toolCallList?.[0];\n\nlet preferred_date = toolCall?.function?.arguments?.preferred_date || null;\nlet preferred_time = toolCall?.function?.arguments?.preferred_time || null;\n\n// Add 5 hours if both date and time exist\nif (preferred_date && preferred_time) {\n  let [hours, minutes] = preferred_time.split(\":\").map(Number);\n\n  hours += 5;\n\n  // Handle day rollover\n  if (hours >= 24) {\n    hours -= 24;\n\n    const d = new Date(preferred_date);\n    d.setDate(d.getDate() + 1);\n    preferred_date = d.toISOString().split(\"T\")[0];\n  }\n\n  preferred_time =\n    String(hours).padStart(2, \"0\") +\n    \":\" +\n    String(minutes).padStart(2, \"0\");\n}\n\nreturn [\n  {\n    json: {\n      preferred_date,\n      preferred_time,\n      tool_name: toolCall?.function?.name || null,\n      tool_call_id: toolCall?.id || null,\n    }\n  }\n];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        256,
-        -608
+        2512,
+        1456
       ],
-      "id": "00f73cb2-884d-4a90-ba62-ef11d4b0505a",
+      "id": "24f93f2a-fbed-4d09-becc-0811bf35b0cd",
       "name": "Code in JavaScript"
     },
     {
@@ -95,10 +95,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        832,
-        -608
+        3088,
+        1456
       ],
-      "id": "8c7a3925-8a8d-47de-a546-c9c54e422d65",
+      "id": "41fb3b2d-098c-4d0b-8f8c-dc1b2f0a2f41",
       "name": "Respond to Webhook"
     },
     {
@@ -112,23 +112,23 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
       "position": [
-        464,
-        -112
+        2720,
+        1952
       ],
-      "id": "1d549126-d2a3-4fc5-a003-bee08bf4674d",
+      "id": "f1f19232-b084-4dcd-a1ba-a42cdd87e6a5",
       "name": "AI Agent1"
     },
     {
       "parameters": {
-        "jsCode": "const toolCall = $json.body?.message?.toolCallList?.[0];\nconst args = toolCall?.function?.arguments || {};\n\nconst full_name = args.full_name || \"\";\nconst contact_number = args.contact_number || \"\";\n\nconst date = args.preferred_date;   // 2026-06-11\nconst time = args.preferred_time;   // 15:00\n\n// \ud83d\udd25 STEP 1: FORCE STRING (NO DATE PARSING)\nconst appointment_datetime = `${date}T${time}:00+05:00`;\n\nreturn [\n  {\n    json: {\n      full_name,\n      contact_number,\n\n      preferred_date: date,\n      preferred_time: time,\n\n      // \ud83d\udd25 THIS IS THE ONLY FIELD YOU MUST USE FOR BOOKING\n      appointment_datetime,\n\n      tool_call_id: toolCall?.id || null,\n    }\n  }\n];"
+        "jsCode": "const toolCall = $json.body?.message?.toolCallList?.[0];\nconst args = toolCall?.function?.arguments || {};\n\nconst full_name = args.full_name || \"\";\nconst contact_number = args.contact_number || \"\";\n\nlet date = args.preferred_date;   // e.g. 2026-06-11\nlet time = args.preferred_time;   // e.g. 15:00\n\n// Split hours and minutes\nlet [hours, minutes] = time.split(\":\").map(Number);\n\n// Add 5 hours\nhours += 5;\n\n// Handle day rollover\nif (hours >= 24) {\n  hours -= 24;\n\n  // Increment date by one day\n  const d = new Date(date);\n  d.setDate(d.getDate() + 1);\n  date = d.toISOString().split(\"T\")[0];\n}\n\n// Format time\nconst updatedTime =\n  String(hours).padStart(2, \"0\") +\n  \":\" +\n  String(minutes).padStart(2, \"0\");\n\n// Build appointment datetime\nconst appointment_datetime = `${date}T${updatedTime}:00+05:00`;\n\nreturn [\n  {\n    json: {\n      full_name,\n      contact_number,\n\n      preferred_date: date,\n      preferred_time: updatedTime,\n\n      appointment_datetime,\n\n      tool_call_id: toolCall?.id || null,\n    }\n  }\n];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        240,
-        -112
+        2496,
+        1952
       ],
-      "id": "3593c270-9f54-4dad-81cf-62cd9cf8080f",
+      "id": "5fb0cc46-754f-45f4-8202-8478c868ec89",
       "name": "Code in JavaScript1"
     },
     {
@@ -145,10 +145,10 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
       "position": [
-        464,
-        48
+        2720,
+        2112
       ],
-      "id": "91721b0a-d2fd-4e61-9c20-9512ab80b4ed",
+      "id": "613fc748-8dcc-40dc-bd53-e57351084abf",
       "name": "OpenAI Chat Model1",
       "credentials": {}
     },
@@ -166,10 +166,10 @@
       "type": "n8n-nodes-base.googleCalendarTool",
       "typeVersion": 1.3,
       "position": [
-        672,
-        -400
+        2928,
+        1664
       ],
-      "id": "a6a1d264-f487-4769-97fb-c63b191469e5",
+      "id": "3ef9a73c-d54e-49f6-ac9d-351dfbd3010b",
       "name": "check_availability",
       "credentials": {}
     },
@@ -191,10 +191,10 @@
       "type": "n8n-nodes-base.googleCalendarTool",
       "typeVersion": 1.3,
       "position": [
-        688,
-        32
+        2944,
+        2096
       ],
-      "id": "ce686a22-3390-44c4-a3ea-e03712c5f204",
+      "id": "3f09ee74-067e-4346-b6c5-741071a1dfb4",
       "name": "create_event",
       "credentials": {}
     },
@@ -207,10 +207,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        816,
-        -112
+        3072,
+        1952
       ],
-      "id": "0c47d02c-ba84-4953-90e6-dadb5f1f593b",
+      "id": "35562ea3-0ec6-472b-b920-430492299858",
       "name": "Respond to Webhook1"
     },
     {
@@ -224,10 +224,10 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
-        96,
-        352
+        2352,
+        2416
       ],
-      "id": "309cb1b0-494e-4b74-a93c-83dd111b7c9d",
+      "id": "57228744-e766-4558-b005-277c0c9695ab",
       "name": "Schedule Trigger"
     },
     {
@@ -244,10 +244,10 @@
       "type": "n8n-nodes-base.googleCalendar",
       "typeVersion": 1.3,
       "position": [
-        320,
-        352
+        2576,
+        2416
       ],
-      "id": "6455c712-3860-4a4f-809d-16a963ce5b42",
+      "id": "b56aff5c-44db-4cce-b19a-b0ebe2ffb7a6",
       "name": "Get many events",
       "credentials": {}
     },
@@ -258,10 +258,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        544,
-        352
+        2800,
+        2416
       ],
-      "id": "9695f967-013b-41dd-8600-603da8606725",
+      "id": "4976d4f7-7f20-4403-b34e-eddd3f88158d",
       "name": "Code in JavaScript2"
     },
     {
@@ -290,10 +290,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        768,
-        352
+        3024,
+        2416
       ],
-      "id": "0093b966-f8e1-40f9-8454-5ceceb17c5e3",
+      "id": "e0a01358-6cdd-40f0-8c20-ea476ca46c05",
       "name": "HTTP Request"
     },
     {
@@ -305,10 +305,10 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -32,
-        -192
+        2224,
+        1872
       ],
-      "id": "4b9e1236-9b08-4b17-8e22-063ae38e2ebf",
+      "id": "0eebdf98-3576-4023-825e-85de58ca68de",
       "name": "Sticky Note"
     },
     {
@@ -321,10 +321,10 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -32,
-        240
+        2224,
+        2304
       ],
-      "id": "35547de0-d110-4faf-a517-1dde9547a818",
+      "id": "65f7aa67-7c42-4b93-baa2-342870a7a517",
       "name": "Sticky Note1"
     },
     {
@@ -337,10 +337,10 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -32,
-        -672
+        2224,
+        1392
       ],
-      "id": "57fe30f7-1fc7-48b2-b145-b55797ea6fb4",
+      "id": "017036d0-5dd8-4cff-b0cb-dee2e2fb410f",
       "name": "Sticky Note2"
     }
   ],
@@ -495,11 +495,11 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "070a4ae7-0a17-4d3c-a655-770dfa0af0b5",
+  "versionId": "3705a805-a3c3-458e-997b-4c256cdd3c53",
   "meta": {
     "templateCredsSetupCompleted": true
   },
   "nodeGroups": [],
-  "id": "lMk1J0igcZ1nBRMw",
+  "id": "fdUo8UidESis2tGZ",
   "tags": []
 }

@@ -1,0 +1,505 @@
+{
+  "name": "AI Doctor Appointment Scheduling Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "yt",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        16,
+        -112
+      ],
+      "id": "ffe25ff0-c9d6-454a-9bcd-82998761bdf9",
+      "name": "book appointment",
+      "webhookId": "GENERATED_ON_IMPORT"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ty",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        32,
+        -608
+      ],
+      "id": "2b57ddd3-e815-4a8b-b205-b276b6d5da14",
+      "name": "check",
+      "webhookId": "GENERATED_ON_IMPORT"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Preferred time : {{ $json.preferred_time }}\nPreferred date : {{ $json.preferred_date }}",
+        "options": {
+          "systemMessage": "=You are a polite and professional AI receptionist for a  clinic   \nYour job is to check appointment availability \n\n# Tools\ncheck_availibility  \n\n# Rules\n1. Always check the doctor's appointment availability before creating a new booking.  \n2. If the requested appointment slot is unavailable, find the next 3 closest available times and reply naturally:  \n   \u201cThe requested time is not available, but here are the nearest available options.\u201d  \n\n4. The current date is: **{{ $now }}**. Always refer to this date when creating or checking appointments.  \n5. Never use past dates or incorrect years \u2014 always use the real current date and time for reference.  \n6. Keep responses short, polite, and natural, like a real receptionist.  \n7. Never mention that you are an AI or that you are using tools \u2014 speak as if you are part of the clinic staff."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        480,
+        -608
+      ],
+      "id": "9875af4b-bf00-421c-bddd-a90b4832c9fb",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        480,
+        -384
+      ],
+      "id": "e980ca41-9da7-4c1a-bd64-ee79f892f1ef",
+      "name": "OpenAI Chat Model",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "jsCode": "const toolCall = $json.body?.message?.toolCallList?.[0];\n\nreturn [\n  {\n    json: {\n      preferred_date: toolCall?.function?.arguments?.preferred_date || null,\n      preferred_time: toolCall?.function?.arguments?.preferred_time || null,\n      tool_name: toolCall?.function?.name || null,\n      tool_call_id: toolCall?.id || null,\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        -608
+      ],
+      "id": "00f73cb2-884d-4a90-ba62-ef11d4b0505a",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"results\": [\n    {\n      \"toolCallId\": \"{{ $('check').item.json.body.message.toolCalls[0].id }}\",\n      \"result\": \"{{ $json.output.replace(/'/g, '\\\\\\\"').replace(/\\n/g, ' ') || '' }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        832,
+        -608
+      ],
+      "id": "8c7a3925-8a8d-47de-a546-c9c54e422d65",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=full_name : {{ $json.full_name }}\ncontact_number : {{ $json.contact_number }}\npreferred_date : {{ $json.preferred_date }}\npreferred_time : {{ $json.preferred_time }}",
+        "options": {
+          "systemMessage": "=You are a polite and professional AI receptionist for a clinic.\n\nYour job is to book appointments using the create_event tool and respond to patients naturally.\n\n---\n\n# \ud83d\udee0 TOOL USAGE RULES\n- Use create_event tool to book appointments.\n- Always pass appointment_datetime exactly as provided (do not modify it).\n- Never change or convert time values.\n\n---\n\n# \u23f0 TIME DISPLAY RULE (VERY IMPORTANT)\nWhen responding to the user:\n\n- Convert 24-hour time into 12-hour format with AM/PM\n- Example conversions:\n  - 15:00 \u2192 3pm\n  - 14:00 \u2192 2pm\n  - 09:00 \u2192 9am\n  - 12:00 \u2192 12pm\n\n- Always remove leading zeros\n- Use lowercase \"am/pm\" (not AM/PM)\n\n---\n\n# \ud83d\udcac RESPONSE FORMAT (MANDATORY)\n\nAfter successful booking, ALWAYS respond exactly in this style:\n\n\"Your appointment has been booked successfully for {Month Day, Year}, at {12-hour time}. If you have any further questions, feel free to ask!\"\n\n---\n\n# \ud83d\udcc5 DATE FORMAT RULE\n- Always display date in this format:\n  June 11, 2026 (Month name, day, year)\n\n---\n\n# \ud83d\udea8 IMPORTANT RULES\n- Do NOT show 24-hour time in responses\n- Do NOT mention system time or timezone\n- Do NOT show ISO format\n- Do NOT say \"15:00\" in final response\n- Be natural, like a real receptionist\n\n---\n\n# \ud83d\udccc CURRENT DATE REFERENCE\n{{ $now.setZone(\"Asia/Karachi\").toFormat(\"yyyy-MM-dd HH:mm\") }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        464,
+        -112
+      ],
+      "id": "1d549126-d2a3-4fc5-a003-bee08bf4674d",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const toolCall = $json.body?.message?.toolCallList?.[0];\nconst args = toolCall?.function?.arguments || {};\n\nconst full_name = args.full_name || \"\";\nconst contact_number = args.contact_number || \"\";\n\nconst date = args.preferred_date;   // 2026-06-11\nconst time = args.preferred_time;   // 15:00\n\n// \ud83d\udd25 STEP 1: FORCE STRING (NO DATE PARSING)\nconst appointment_datetime = `${date}T${time}:00+05:00`;\n\nreturn [\n  {\n    json: {\n      full_name,\n      contact_number,\n\n      preferred_date: date,\n      preferred_time: time,\n\n      // \ud83d\udd25 THIS IS THE ONLY FIELD YOU MUST USE FOR BOOKING\n      appointment_datetime,\n\n      tool_call_id: toolCall?.id || null,\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -112
+      ],
+      "id": "3593c270-9f54-4dad-81cf-62cd9cf8080f",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        464,
+        48
+      ],
+      "id": "91721b0a-d2fd-4e61-9c20-9512ab80b4ed",
+      "name": "OpenAI Chat Model1",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "resource": "calendar",
+        "calendar": {
+          "__rl": true,
+          "value": "YOUR_CALENDAR_ID",
+          "mode": "list",
+          "cachedResultName": "appointment"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        -400
+      ],
+      "id": "a6a1d264-f487-4769-97fb-c63b191469e5",
+      "name": "check_availability",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "YOUR_CALENDAR_ID",
+          "mode": "list",
+          "cachedResultName": "appointment"
+        },
+        "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start', ``, 'string') }}",
+        "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End', ``, 'string') }}",
+        "additionalFields": {
+          "description": "=Here is the info of customer:\n\ncustomer number : {{ $json.contact_number }}\n\ncustomer name : {{ $json.full_name }}\n\n\n",
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Summary', ``, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        688,
+        32
+      ],
+      "id": "ce686a22-3390-44c4-a3ea-e03712c5f204",
+      "name": "create_event",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"results\": [\n    {\n      \"toolCallId\": \"{{ $('book appointment').item.json.body.message.toolCallList[0].id }}\",\n      \"result\": \"{{ $json.output.replace(/'/g, '\\\\\\\"').replace(/\\n/g, ' ') || '' }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        816,
+        -112
+      ],
+      "id": "0c47d02c-ba84-4953-90e6-dadb5f1f593b",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        96,
+        352
+      ],
+      "id": "309cb1b0-494e-4b74-a93c-83dd111b7c9d",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "YOUR_CALENDAR_ID",
+          "mode": "list",
+          "cachedResultName": "appointment"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        320,
+        352
+      ],
+      "id": "6455c712-3860-4a4f-809d-16a963ce5b42",
+      "name": "Get many events",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "jsCode": "const description = $json.description || \"\";\n\n// Extract using regex\nconst nameMatch = description.match(/Name:\\s*(.*)/i);\nconst contactMatch = description.match(/Contact:\\s*(.*)/i);\n\nconst customer_name = nameMatch ? nameMatch[1].trim() : null;\nconst customer_number = contactMatch ? contactMatch[1].trim() : null;\n\nreturn [\n  {\n    json: {\n      customer_name,\n      customer_number\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        352
+      ],
+      "id": "9695f967-013b-41dd-8600-603da8606725",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.vapi.ai/call",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_VAPI_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"assistantId\": \"YOUR_ASSISTANT_ID\",\n  \"phoneNumberId\": \"YOUR_PHONE_NUMBER_ID\",\n  \"customer\": {\n    \"number\": \"{{ $json.customer_name }}\"\n  },\n  \"assistantOverrides\": {\n    \"variableValues\": {\n      \"customerName\": \"{{ $json.customer_name }}\",\n      \"appointmentTime\": \"{{ $('Get many events').item.json.end.dateTime }}\",\n     \"appointmentDate\": \"{{ new Date($('Get many events').item.json.end.dateTime).toLocaleDateString('en-US', { dateStyle: 'full', timeZone: $ ('Get many events').item.json.end.timeZone }) }}\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        768,
+        352
+      ],
+      "id": "0093b966-f8e1-40f9-8454-5ceceb17c5e3",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "content": "## Appointment Booking:",
+        "height": 384,
+        "width": 1056
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        -192
+      ],
+      "id": "4b9e1236-9b08-4b17-8e22-063ae38e2ebf",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Outbound Call :",
+        "height": 320,
+        "width": 1056,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        240
+      ],
+      "id": "35547de0-d110-4faf-a517-1dde9547a818",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Availability Checking",
+        "height": 432,
+        "width": 1056,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        -672
+      ],
+      "id": "57fe30f7-1fc7-48b2-b145-b55797ea6fb4",
+      "name": "Sticky Note2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "check": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "book appointment": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_availability": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create_event": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get many events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many events": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "070a4ae7-0a17-4d3c-a655-770dfa0af0b5",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "id": "lMk1J0igcZ1nBRMw",
+  "tags": []
+}
